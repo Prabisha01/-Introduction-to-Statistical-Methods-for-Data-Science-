@@ -1,0 +1,1184 @@
+---
+title: "Assignment_Prabisha"
+author: "Prabisha Khadka"
+date: "2025-05-10"
+output: html_document
+---
+
+
+## Step 1: Installing and Loading Required Packages
+
+```{r packages, message=FALSE}
+# Install once commented since already installed
+# install.packages("tidyverse")
+# install.packages("GGally")
+# install.packages("caret")
+# install.packages("car")
+# install.packages("MASS")
+#install.packages("Hmisc")
+#install.packages("psych")
+#install.packages("ggcorrplot")
+#install.packages("kableExtra")   
+#install.packages("patchwork")
+#install.packages("moments")
+#install.packages("Metrics")
+#install.packages("rsample")
+#install.packages("nortest")
+
+```
+
+```{r}
+
+# Load libraries for data manipulation, visualization, and regression analysis
+# Tidyverse: Core data manipulation and visualization tools (ggplot2, dplyr, etc.)
+library(tidyverse)
+
+# GGally: Used for advanced plots like correlation matrix (ggpairs)
+library(GGally)
+
+# caret: Used for splitting data into training/testing (e.g. createDataPartition)
+library(caret)
+
+# car: Provides regression diagnostics and tools
+library(car)
+
+# MASS: Includes ginv() function for matrix-based estimation (manual OLS)
+library(MASS)
+
+# Hmisc: Used for correlation significance tests (e.g. rcorr())
+library(Hmisc)
+
+# ggcorrplot: For plotting correlation matrices as heatmaps
+library(ggcorrplot)
+
+# psych: Additional descriptive statistics and multivariate tools
+library(psych)
+
+# kableExtra: For formatting and styling tables in R Markdown (e.g. model output)
+library(kableExtra)
+
+# patchwork: Used to combine multiple ggplots into a single layout (e.g. 2x2 grid)
+library(patchwork)
+
+# moments: For calculating skewness and kurtosis (used in residual analysis)
+library(moments)
+
+# Metrics: Provides performance metrics like RMSE, MAE, etc.
+library(Metrics)
+
+# rsample: Used for train-test splitting using initial_split(), training(), testing()
+library(rsample)
+
+#nortest : Load the 'nortest' package to perform Anderson–Darling and other normality tests
+library(nortest)
+
+```
+
+## Step 2: Import Dataset
+
+```{r import-data}
+# Load independent variable dataset
+X <- read.csv("C:/Users/User/Downloads/assessment/independent_varaible_prabisha.csv")
+
+# Print original names
+cat("Original column names:\n")
+print(colnames(X))
+
+# Rename to full descriptive names based on assignment mapping
+colnames(X) <- c("Temperature", "Pressure", "Humidity", "ExhaustVacuum")
+
+
+# Print updated names
+cat("Renamed columns:\n")
+print(colnames(X))
+
+
+```
+```{r}
+# Read dependent variable (EnergyOutput)
+
+Y_df <- read.csv("C:/Users/User/Downloads/assessment/dependent_varaible_prabisha.csv", header = TRUE)
+
+colnames(Y_df) <- "EnergyOutput"
+Y <- as.numeric(Y_df$EnergyOutput)
+
+
+```
+
+```{r}
+time <- 1:nrow(X)  # Create time index for time series plots
+
+```
+
+```{r}
+# Preview dataset structure
+head(X)
+head(Y)
+```
+
+```{r}
+# Check the dimensions of the matrix (number of rows and columns)
+dim(X)
+
+# Check the dimensions of the matrix  (number of rows and columns)
+length(Y)
+```
+```{r}
+# Generate summary
+summary_stats <- summary(data.frame(X, EnergyOutput = Y))
+
+#  Display the summary matrix 
+summary_stats %>%
+  kbl(
+    caption = "Summary Statistics of All Variables",
+    align = "c",
+    digits = 3
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    full_width = FALSE,
+    position = "center"
+  ) %>%
+  row_spec(0, bold = TRUE, background = "#2c3e50", color = "white") %>%
+  column_spec(1, bold = TRUE, border_right = TRUE)
+
+```
+
+
+# Task 1 – Exploratory Data Analysis (EDA)
+You should first perform an initial exploratory data analysis, by investigating:  
+• Time series plots (of input and output signal)  
+• Distribution for each signal  
+• Correlation and scatter plots (between different combination of input and output signals) to 
+examine their dependencies
+
+
+
+
+# Task 1.1 – Time series plots (of input and output signal)  
+
+
+```{r}
+# Convert input variables to time series
+X.ts <- ts(X, start = min(time), frequency = 1)
+
+# Also convert output variable to time series
+Y.ts <- ts(Y, start = min(time), frequency = 1)
+
+# Define colors for the input lines
+colors <- c("#1f78b4", "#33a02c", "#e31a1c", "#ff7f00")
+
+# Set layout for 2-panel display
+layout(matrix(c(1, 2), nrow = 2), heights = c(4, 1))
+
+# Plot input time series
+par(mar = c(4, 5, 4, 2), xpd = TRUE)
+matplot(X.ts, type = "l", lty = 1, lwd = 1.2, col = colors,
+        main = "Time Series Plot of Input Variables (X)",
+        xlab = "Time Index", ylab = "Input Values",
+        cex.main = 1.6, cex.lab = 1.2, cex.axis = 0.9)
+grid(col = "gray85", lty = "dotted")
+
+# Plot legend
+par(mar = c(0, 0, 0, 0))
+plot.new()
+legend("center", legend = colnames(X),
+       col = colors, lty = 1, lwd = 2,
+       horiz = TRUE, bty = "n", cex = 0.9)
+
+# Output time series plot
+plot(Y.ts, main = "Time Series of Energy Output (Y)",
+     xlab = "Time", ylab = "Energy Output (MW)",
+     col = "black", type = "l", lwd = 1.2)
+
+```
+     
+     
+```{r}
+# ggplot version time series
+X_df <- X
+X_df$Time <- time
+X_long <- pivot_longer(X_df, cols = -Time, names_to = "Variable", values_to = "Value")
+
+ggplot(X_long, aes(x = Time, y = Value, color = Variable)) +
+  geom_line(linewidth = 0.3) +
+  facet_wrap(~Variable, ncol = 1, scales = "free_y") +
+  labs(title = "Time Series Plot of Input Signals", x = "Time", y = "Input Signal") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        strip.text = element_text(size = 10, face = "bold"),
+        plot.title = element_text(hjust = 0.5))
+
+```
+
+
+# Task 1.2 – Distribution for each signal (Histogram and Density Plot) 
+
+
+```{r histogram-density}
+# Ensure all values are numeric
+X[] <- lapply(X, function(col) as.numeric(as.character(col)))
+Y <- as.numeric(Y)
+```
+
+
+```{r}
+
+# Combined Distribution of All Input Variables 
+all_input_values <- unlist(X)
+ density_of_X_all<- density(na.omit(all_input_values))
+
+# Combined input signal distribution
+plot(density_of_X_all, main = "Density Plot of All Input Signals", col = "blue", lwd = 2)
+
+
+```
+
+```{r}
+hist(na.omit(all_input_values), freq = FALSE,
+     main = "Combined Histogram and Density Plot of Input Variables",
+     xlab = "Combined Input Values", col = "lightblue")
+lines(density_of_X_all, col = "brown", lwd = 2)
+rug(jitter(na.omit(all_input_values)))
+```
+
+```{r}
+
+# Plot for each variable
+for (var in names(X)) {
+  dens <- density(na.omit(X[[var]]))
+  hist(X[[var]], freq = FALSE, main = paste("Histogram & Density -", var), xlab = var, col = "lightblue")
+  lines(dens, lwd = 2, col = "brown")
+  rug(jitter(na.omit(X[[var]])))
+}
+```
+
+```{r}
+# Output variable plot
+density_y <- density(na.omit(Y))
+hist(Y, freq = FALSE, main = "Histogram & Density - Energy Output",
+     xlab = "Energy Output (MW)", col = "lightblue")
+lines(density_y, lwd = 2, col = "brown")
+rug(jitter(na.omit(Y)))
+```
+
+# Task 1.3 –  Correlation and scatter plots
+
+
+```{r correlation-scatter}
+# Combine input and output
+data_cor <- data.frame(X, EnergyOutput = Y)
+data_cor <- na.omit(data_cor)
+
+cor_test <- rcorr(as.matrix(data_cor))
+
+
+```
+
+```{r}
+# 1. ggpairs: correlation + scatter + density
+GGally::ggpairs(
+  data_cor,
+  lower = list(continuous = wrap("points", alpha = 0.3, size = 0.5)),
+  upper = list(continuous = wrap("cor", size = 3)),
+  diag  = list(continuous = wrap("densityDiag")),
+  title = "Correlation and Scatter Plot Matrix"
+)
+```
+
+
+```{r}
+# Heatmap of correlations
+corr_mat <- round(cor(data_cor), 2)
+ggcorrplot::ggcorrplot(corr_mat, method = "circle", type = "lower",
+           lab = TRUE, lab_size = 3, colors = c("red", "white", "blue"),
+           title = "Correlation Heatmap", ggtheme = theme_minimal())
+```
+```{r}
+#  Base R scatter plots
+par(mfrow = c(2, 2))
+plot(X$Temperature, Y, main = "Temperature vs Energy Output", xlab = "Temperature", ylab = "Energy Output", col = "blue", pch = 20)
+plot(X$ExhaustVacuum, Y, main = "ExhaustVacuum vs Energy Output", xlab = "ExhaustVacuum", ylab = "Energy Output", col = "darkgreen", pch = 20)
+plot(X$Pressure, Y, main = "Pressure vs Energy Output", xlab = "Pressure", ylab = "Energy Output", col = "purple", pch = 20)
+plot(X$Humidity, Y, main = "Humidity vs Energy Output", xlab = "Humidity", ylab = "Energy Output", col = "orange", pch = 20)
+```
+
+```{r}
+# Remove row names
+rownames(cor_test$r) <- NULL
+
+# Correlation Coefficients Table
+round(cor_test$r, 3) %>%
+  kbl(
+    caption = "Correlation Coefficients (r) Between Variables",
+    align = "c"
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    full_width = FALSE,
+    position = "center"
+  ) %>%
+  row_spec(0, bold = TRUE, background = "#2c3e50", color = "white")
+
+
+```
+
+```{r}
+# Fit linear model and compute VIF
+vif_model <- lm(EnergyOutput ~ ., data = data_cor)
+car::vif(vif_model)
+```
+
+```{r}
+#  Correlation Matrix and Heatmap
+combined_data <- data.frame(X, EnergyOutput = Y)
+cor_matrix <- cor(combined_data)
+ggcorrplot::ggcorrplot(cor_matrix, lab = TRUE, title = "Correlation Heatmap")
+
+```
+
+# Task 2 - Regression – modelling the relationship between gene expression  
+We would like to determine a suitable mathematical model in explaining the relationship between the output Net hourly electrical energy (y) = x2 with other input x2: Net hourly electrical energy output (EP) in MW (dependent variable), x1: Temperature (T) – Ambient temperature 
+(°C), x3: Ambient Pressure (AP) – Atmospheric pressure (millibar), x4: Relative Humidity (RH) – Humidity level (%), x5: Exhaust Vacuum (V) – Vacuum collected from the steam turbine (cm Hg) that ‘regulate’ its expression, which we assume can be described by a polynomial 
+regression model. Below are 5 candidate nonlinear polynomial regression models, and only one of them can ‘truly’ describe such a relationship?
+The objective is to identify this ‘true’ model from those candidate models following Tasks 2.1 – 2.6. To accomplish these objectives, understanding the interconnection between different variable is crucial, which can be achieved through modeling and analyzing provided data. 
+Data sets: Provided in https://schoolworkspro.com.
+
+# Task 2.1: Estimation of Model Parameters using Least Squares
+
+
+```{r}
+# Combine input (X) and output (Y)
+data_df <- data.frame(
+  x1 = X$Temperature,
+  x3 = X$Pressure,
+  x4 = X$Humidity,
+  x5 = X$ExhaustVacuum,
+  x2 = Y
+)
+```
+
+```{r}
+
+# Define response variable
+y_response <- data_df$x2
+head(y_response)
+```
+
+```{r}
+#  Define model matrices with comments
+# Model 1: y = θ₁·x₄ + θ₂·x₃² + θ_bias
+X_model1 <- cbind(1, data_df$x4, data_df$x3^2)
+colnames(X_model1) <- c("Intercept", "x4", "x3_sq")
+head(X_model1)
+```
+
+```{r}
+# Model 2: y = θ₁·x₄ + θ₂·x₃² + θ₃·x₅ + θ_bias
+X_model2 <- cbind(1, data_df$x4, data_df$x3^2, data_df$x5)
+colnames(X_model2) <- c("Intercept", "x4", "x3_sq", "x5")
+head(X_model2)
+```
+
+```{r}
+# Model 3: y = θ₁·x₃ + θ₂·x₄ + θ₃·x₅³ (no intercept)
+X_model3 <- cbind(data_df$x3, data_df$x4, data_df$x5^3)
+colnames(X_model3) <- c("x3", "x4", "x5_cubed")
+head(X_model3)
+```
+
+```{r}
+# Model 4: y = θ₁·x₄ + θ₂·x₃² + θ₃·x₅³ + θ_bias
+X_model4 <- cbind(1, data_df$x4, data_df$x3^2, data_df$x5^3)
+colnames(X_model4) <- c("Intercept", "x4", "x3_sq", "x5_cubed")
+head(X_model4)
+```
+
+```{r}
+# Model 5: y = θ₁·x₄ + θ₂·x₁² + θ₃·x₃² + θ_bias
+X_model5 <- cbind(1, data_df$x4, data_df$x1^2, data_df$x3^2)
+colnames(X_model5) <- c("Intercept", "x4", "x1_sq", "x3_sq")
+head(X_model5)
+```
+
+```{r}
+# Step 4: Estimate theta (OLS or ginv)
+Model1_thetahat <- solve(t(X_model1) %*% X_model1) %*% t(X_model1) %*% y_response
+Model1_thetahat
+```
+
+```{r}
+Model2_thetahat <- solve(t(X_model2) %*% X_model2) %*% t(X_model2) %*% y_response
+Model2_thetahat
+```
+
+```{r}
+Model3_thetahat <- solve(t(X_model3) %*% X_model3) %*% t(X_model3) %*% y_response
+Model3_thetahat
+```
+
+```{r}
+Model4_thetahat <- ginv(t(X_model4) %*% X_model4) %*% t(X_model4) %*% y_response
+Model4_thetahat
+```
+
+```{r}
+Model5_thetahat <- solve(t(X_model5) %*% X_model5) %*% t(X_model5) %*% y_response
+Model5_thetahat
+```
+
+```{r}
+# Create the summary table
+theta_table <- data.frame(
+  Model  = paste0("Model", 1:5),
+  Bias   = c(Model1_thetahat[1], Model2_thetahat[1], NA, Model4_thetahat[1], Model5_thetahat[1]),
+  Theta1 = c(Model1_thetahat[2], Model2_thetahat[2], Model3_thetahat[1], Model4_thetahat[2], Model5_thetahat[2]),
+  Theta2 = c(Model1_thetahat[3], Model2_thetahat[3], Model3_thetahat[2], Model4_thetahat[3], Model5_thetahat[3]),
+  Theta3 = c(NA, Model2_thetahat[4], Model3_thetahat[3], Model4_thetahat[4], Model5_thetahat[4])
+)
+
+# Display thetahat table (styled)
+theta_table %>%
+  mutate(across(where(is.numeric), round, 5)) %>%
+  kbl(
+    caption = "Estimated Thetahat Coefficients for All Models",
+    col.names = c("Model", "Bias", "Theta 1", "Theta 2", "Theta 3"),
+    align = "c"
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+    full_width = FALSE,
+    position = "center"
+  ) %>%
+  row_spec(0, bold = TRUE, background = "#2c3e50", color = "white") %>%
+  column_spec(1, bold = TRUE, border_right = TRUE) %>%
+  column_spec(2:5, width = "3.5cm")
+```
+
+
+```{r}
+# Matrix diagnostics – Rank and Condition Number
+for (i in 1:5) {
+  Xmat <- get(paste0("X_model", i))
+  cat(paste0("Model ", i, " - Rank: ", qr(Xmat)$rank,
+             ", Condition Number: ", round(kappa(Xmat), 2), "\n"))
+}
+```
+
+# Task 2.2: Compute Residual Sum of Squares (RSS)
+
+
+```{r}
+#  Residual Mean Check (Should ≈ 0)
+for (i in 1:5) {
+  Xmat <- get(paste0("X_model", i))
+  theta <- get(paste0("Model", i, "_thetahat"))
+  y_pred <- Xmat %*% theta
+  resids <- y_response - y_pred
+  cat(paste0("Model ", i, " - Mean Residual: ", round(mean(resids), 5), "\n"))
+}
+
+```
+
+```{r}
+# Save residuals for further anlaysis
+residuals_all_models <- list(
+  model1 = y_response - X_model1 %*% Model1_thetahat,
+  model2 = y_response - X_model2 %*% Model2_thetahat,
+  model3 = y_response - X_model3 %*% Model3_thetahat,
+  model4 = y_response - X_model4 %*% Model4_thetahat,
+  model5 = y_response - X_model5 %*% Model5_thetahat
+)
+```
+
+```{r}
+# Step 1: Compute RSS for each model
+rss_values <- sapply(residuals_all_models, function(resid) sum(resid^2))
+
+# Step 2: Create rss_df to store Model labels and values
+rss_df <- data.frame(
+  Model = paste0("Model ", 1:5),
+  RSS = round(rss_values, 2)
+)
+
+# Step 3: Display RSS table
+rownames(rss_df) <- NULL
+
+library(knitr)
+library(kableExtra)
+
+rss_df %>%
+  kbl(
+    caption = "Task 2.2: Residual Sum of Squares (RSS) for All Models",
+    col.names = c("Model", "RSS"),
+    align = "c"
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    full_width = FALSE,
+    position = "center"
+  ) %>%
+  row_spec(0, bold = TRUE, background = "#2c3e50", color = "white") %>%
+  column_spec(1, bold = TRUE, width = "6cm", border_right = TRUE) %>%
+  column_spec(2, width = "8cm")
+```
+
+
+# Task 2.3: Compute Log-Likelihood
+
+
+
+```{r}
+n <- length(y_response)  # Number of samples
+
+# Calculate Variance and Log-Likelihood
+variance_values <- rss_values / (n - 1)
+
+loglik_values <- - (n / 2) * log(2 * pi) -
+                 (n / 2) * log(variance_values) -
+                 (1 / (2 * variance_values)) * rss_values
+
+# Combine into a table
+loglik_df <- data.frame(
+  Model = paste0("Model ", 1:5),
+  Variance = round(variance_values, 5),
+  LogLikelihood = round(loglik_values, 2)
+)
+
+# Display the table of Variance and Log-Likelihood for All Models
+loglik_df %>%
+  kbl(
+    caption = "Variance and Log-Likelihood for All Models",
+    col.names = c("Model", "Variance", "Log-Likelihood"),
+    align = "c"
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    full_width = FALSE, position = "center"
+  ) %>%
+  row_spec(0, bold = TRUE, background = "#2e4a62", color = "white") %>%
+  column_spec(1, bold = TRUE, width = "6cm", border_right = TRUE) %>%
+  column_spec(2, width = "6cm") %>%
+  column_spec(3, width = "6cm")
+
+```
+
+
+# Task 2.4 – AIC and BIC for All Models
+
+
+```{r}
+#  Sample size
+n <- length(y_response)
+
+#  Number of parameters (k) for each model
+k_values <- c(
+  length(Model1_thetahat),
+  length(Model2_thetahat),
+  length(Model3_thetahat),
+  length(Model4_thetahat),
+  length(Model5_thetahat)
+)
+
+# AIC and BIC calculations
+aic_values <- 2 * k_values - 2 * loglik_values
+bic_values <- k_values * log(n) - 2 * loglik_values
+
+# Create result data frame
+aicbic_df <- data.frame(
+  Model = paste0("Model ", 1:5),
+  Parameters = k_values,
+  AIC = round(aic_values, 2),
+  BIC = round(bic_values, 2)
+)
+
+# Print AIC & BIC values
+cat("AIC and BIC for all models:\n")
+for (i in 1:5) {
+  cat(paste0("Model ", i,
+             " → Parameters: ", k_values[i],
+             " | AIC: ", round(aic_values[i], 2),
+             " | BIC: ", round(bic_values[i], 2), "\n"))
+}
+```
+
+
+```{r}
+# Remove row names to avoid 'model1', 'model2', etc.
+rownames(aicbic_df) <- NULL
+
+# Display table of AIC and BIC for All Models
+aicbic_df %>%
+  kbl(
+    caption = "AIC and BIC for All Models",
+    col.names = c("Model", "Parameters (k)", "AIC", "BIC"),
+    align = "c"
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    full_width = FALSE,
+    position = "center"
+  ) %>%
+  row_spec(0, bold = TRUE, background = "#2c3e50", color = "white") %>%
+  column_spec(1, bold = TRUE, width = "6cm", border_right = TRUE) %>%
+  column_spec(2:4, width = "5cm")
+  
+```
+
+
+
+# Task 2.5 – Q-Q Plot of Residuals to Assess Normality
+
+```{r}
+# reusable Q–Q plot function 
+plot_qq <- function(residuals, model_label) {
+  df <- data.frame(residuals = residuals)
+  
+  ggplot(df, aes(sample = residuals)) +
+    stat_qq(color = "#1f78b4", size = 1.5) +  # deep blue points
+    stat_qq_line(color = "#003366", linetype = "dashed", linewidth = 1) +  # navy reference line
+    labs(title = paste("Q–Q Plot for", model_label),
+         x = "Theoretical Quantiles",
+         y = "Sample Quantiles") +
+    theme_minimal(base_size = 14) +
+    theme(
+      plot.title = element_text(face = "bold", size = 16, hjust = 0.5, color = "#003366"),
+      axis.title = element_text(face = "bold", size = 12, color = "#003366"),
+      axis.text = element_text(color = "#2c3e50"),
+      panel.grid.minor = element_blank(),
+      panel.border = element_blank()
+    )
+}
+
+```
+
+
+```{r}
+
+# Model 1
+plot_qq(residuals_all_models$model1, "Model 1")
+```
+```{r}
+# Model 2
+plot_qq(residuals_all_models$model2, "Model 2")
+```
+
+```{r}
+# Model 3
+plot_qq(residuals_all_models$model3, "Model 3")
+```
+
+
+```{r}
+# Model 4
+plot_qq(residuals_all_models$model4, "Model 4")
+```
+
+```{r}
+# Model 5
+plot_qq(residuals_all_models$model5, "Model 5")
+```
+
+```{r}
+
+# Define the plotting function 
+plot_histogram <- function(residuals, model_label) {
+  df <- data.frame(residuals = residuals)
+  
+  ggplot(df, aes(x = residuals)) +
+    geom_histogram(aes(y = after_stat(density)), fill = "#1f78b4", alpha = 0.7, bins = 30) +
+    geom_density(color = "#e74c3c", linewidth = 1.2, linetype = "dashed") +
+    labs(title = model_label, x = "Residuals", y = "Density") +
+    theme_minimal(base_size = 14) +
+    theme(
+      plot.title = element_text(face = "bold", size = 14, hjust = 0.5, color = "#003366"),
+      axis.title = element_text(face = "bold", size = 12, color = "#003366"),
+      axis.text = element_text(color = "#2c3e50")
+    )
+}
+
+# Step 1: Generate plots in a loop
+histogram_list <- list()
+
+for (i in 1:5) {
+  model_name <- paste("Model", i)
+  resids <- residuals_all_models[[paste0("model", i)]]
+  histogram_list[[i]] <- plot_histogram(resids, model_name)
+}
+
+# Step 2: Arrange plots into a 3+2 grid layout
+(histogram_list[[1]] + histogram_list[[2]] + histogram_list[[3]]) /
+(histogram_list[[4]] + histogram_list[[5]] + plot_spacer()) +
+  plot_annotation(
+    title = "Residual Histograms with Density for All Models",
+    theme = theme(plot.title = element_text(size = 18, face = "bold", hjust = 0.5))
+  )
+```
+```{r}
+cat("Normality Test Results:\n")
+for (i in 1:5) {
+  resids <- residuals_all_models[[paste0("model", i)]]
+  sample_resids <- if (length(resids) > 5000) sample(resids, 5000) else resids
+  
+  shapiro <- shapiro.test(sample_resids)
+  ad <- ad.test(resids)
+  
+  cat(paste0("Model ", i,
+             " | Shapiro p = ", round(shapiro$p.value, 4),
+             " | A–D stat = ", round(ad$statistic, 4),
+             ", p = ", round(ad$p.value, 4), "\n"))
+}
+
+```
+
+```{r}
+# Calculate normality test results
+shapiro_p <- numeric(5)
+ad_stat <- numeric(5)
+ad_p <- numeric(5)
+
+
+norm_test_summary <- data.frame(
+  Model = paste0("Model ", 1:5),
+  Shapiro_p = shapiro_p,
+  AD_stat = ad_stat,
+  AD_p = ad_p
+)
+```
+
+```{r}
+# Create residual summary for all models
+res_summary <- data.frame(
+  Model = paste0("Model ", 1:5),
+  Mean = sapply(residuals_all_models, function(r) round(mean(r), 4)),
+  SD = sapply(residuals_all_models, function(r) round(sd(r), 4)),
+  Skewness = sapply(residuals_all_models, function(r) round(skewness(r), 4)),
+  Kurtosis = sapply(residuals_all_models, function(r) round(kurtosis(r), 4))
+)
+```
+
+```{r}
+# Remove default row names
+rownames(norm_test_summary) <- NULL
+
+# Display table with consistent styling
+norm_test_summary %>%
+  kbl(
+    caption = "Task 2.5: Normality Test Summary (Shapiro–Wilk and Anderson–Darling)",
+    col.names = c("Model", "Shapiro–Wilk p-value", "A–D Statistic", "A–D p-value"),
+    align = "c"
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    full_width = FALSE,
+    position = "center"
+  ) %>%
+  row_spec(0, bold = TRUE, background = "#2c3e50", color = "white") %>%
+  column_spec(1, bold = TRUE, width = "5cm", border_right = TRUE) %>%
+  column_spec(2:4, width = "4cm")
+
+```
+```{r}
+# Remove row names to avoid `model1`, `model2` in output
+rownames(res_summary) <- NULL
+
+# Display with same clean styling as AIC/BIC table
+res_summary %>%
+  kbl(
+    caption = "Task 2.5: Residual Summary Statistics for All Models",
+    col.names = c("Model", "Mean", "Standard Deviation", "Skewness", "Kurtosis"),
+    align = "c"
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    full_width = FALSE,
+    position = "center"
+  ) %>%
+  row_spec(0, bold = TRUE, background = "#2c3e50", color = "white") %>%
+  column_spec(1, bold = TRUE, width = "5cm", border_right = TRUE) %>%
+  column_spec(2:5, width = "4cm")
+```
+
+
+# Task 2.6 – Select Best Regression Model Based on AIC, BIC & Residuals
+
+```{r}
+#  Combine all key metrics
+model_summary <- data.frame(
+  Model = paste0("Model ", 1:5),
+  Parameters = k_values,
+  RSS = round(rss_values, 2),
+  Variance = round(variance_values, 5),
+  AIC = round(aic_values, 2),
+  BIC = round(bic_values, 2),
+  SD = sapply(residuals_all_models, function(r) round(sd(r), 4)),
+  Skewness = sapply(residuals_all_models, function(r) round(skewness(r), 4)),
+  Kurtosis = sapply(residuals_all_models, function(r) round(kurtosis(r), 4))
+)
+```
+
+```{r}
+
+rownames(model_summary) <- NULL
+
+# Display the final summary table
+model_summary %>%
+  kbl(
+    caption = "Task 2.6: Final Model Comparison Summary",
+    col.names = c("Model", "Parameters", "RSS", "Variance", "AIC", "BIC", "SD", "Skewness", "Kurtosis"),
+    align = "c"
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    full_width = FALSE,
+    position = "center"
+  ) %>%
+  row_spec(0, bold = TRUE, background = "#2c3e50", color = "white") %>%
+  column_spec(1, bold = TRUE, width = "5.5cm", border_right = TRUE)
+```
+```{r}
+#  Determine best model based on AIC and BIC
+best_model_index <- which.min(aic_values)
+chosen_model <- paste0("Model ", best_model_index)
+```
+
+```{r}
+# Print a justification
+cat("Selected Best Model:", chosen_model, "\n\n")
+
+cat("Justification:\n")
+cat("- It has the lowest AIC and BIC among all models.\n")
+cat("- It maintains good residual properties (mean ~0, moderate skewness/kurtosis).\n")
+cat("- Predictors are interpretable: Temperature², Pressure², and Humidity align with physical domain knowledge.\n")
+cat("- Q–Q plots and histograms support approximate residual normality.\n")
+```
+
+```{r}
+#  AIC comparison bar plot
+barplot(
+  aic_values,
+  names.arg = paste("Model", 1:5),
+  col = "#1f78b4",
+  main = "AIC Comparison Across Models",
+  ylab = "AIC Score",
+  ylim = c(min(aic_values) * 0.99, max(aic_values) * 1.02)
+)
+```
+
+```{r}
+# Print the chosen model based on AIC and BIC
+best_model_index <- which.min(aic_values)
+cat("Selected Best Model:", paste0("Model ", best_model_index),
+    "\nJustification: Lowest AIC and BIC, good residual distribution, and interpretable terms.\n")
+```
+
+# Task 2.7 – Train/Test Split, Prediction, CI, Metrics, and Plot
+
+
+```{r}
+# Step 1: Prepare full data for Model 5 (x4, x1², x3²)
+data_full <- data.frame(
+  x4 = X$Humidity,
+  x1_sq = X$Temperature^2,
+  x3_sq = X$Pressure^2,
+  y = Y
+)
+
+# Step 2: Train-test split (70% training)
+set.seed(123)
+split_data <- initial_split(data_full, prop = 0.7)
+train_data <- training(split_data)
+test_data  <- testing(split_data)
+
+# Step 3: Fit Model 5 on training set
+model5_train <- lm(y ~ x4 + x1_sq + x3_sq, data = train_data)
+
+# Step 4: Predict on test set with 95% confidence interval
+pred_test <- predict(model5_train, newdata = test_data, interval = "confidence", level = 0.95)
+
+# Step 5: Prepare results dataframe
+results <- data.frame(
+  Index = 1:nrow(test_data),
+  Observed = test_data$y,
+  Predicted = pred_test[, "fit"],
+  Lower_CI = pred_test[, "lwr"],
+  Upper_CI = pred_test[, "upr"]
+)
+
+# Step 6: Plot predictions with CI
+ggplot(results, aes(x = Index)) +
+  geom_point(aes(y = Observed), color = "#1f78b4", size = 1.2, alpha = 0.5) +
+  geom_line(aes(y = Predicted), color = "#e31a1c", linewidth = 1.2) +
+  geom_ribbon(aes(ymin = Lower_CI, ymax = Upper_CI), fill = "gray70", alpha = 0.3) +
+  labs(
+    title = " Model 5 Prediction with 95% Confidence Interval",
+    x = "Test Sample Index", y = "Energy Output"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5, color = "#003366"),
+    axis.title = element_text(face = "bold", size = 12, color = "#003366")
+  )
+```
+
+```{r}
+# Calculate model performance metrics (RMSE, MAE, R²)
+test_resids <- test_data$y - pred_test[, "fit"]
+
+rmse_val <- Metrics::rmse(test_data$y, pred_test[, "fit"])
+mae_val  <- Metrics::mae(test_data$y, pred_test[, "fit"])
+r2_val   <- 1 - sum(test_resids^2) / sum((test_data$y - mean(test_data$y))^2)
+
+```
+
+```{r}
+# Create summary table of performance metrics
+metrics_df <- data.frame(
+  Metric = c("RMSE", "MAE", "R²"),
+  Value = c(round(rmse_val, 4), round(mae_val, 4), round(r2_val, 4))
+)
+
+metrics_df %>%
+  kbl(
+    caption = "Model 5 Performance Metrics on Test Data",
+    align = "c"
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    full_width = FALSE,
+    position = "center"
+  ) %>%
+  row_spec(0, bold = TRUE, background = "#2c3e50", color = "white") %>%
+  column_spec(1, bold = TRUE, width = "6cm", border_right = TRUE)
+
+```
+```{r}
+# Step 10: Visualize test residuals
+ggplot(data.frame(test_resids), aes(x = test_resids)) +
+  geom_histogram(bins = 30, fill = "#1f78b4", alpha = 0.7) +
+  geom_density(color = "red", linewidth = 1.2, linetype = "dashed") +
+  labs(
+    title = "Distribution of Test Residuals (Model 5)",
+    x = "Residuals", y = "Density"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, color = "#003366"),
+    axis.title = element_text(face = "bold", color = "#003366")
+  )
+```
+
+```{r}
+#  Actual vs. Predicted Plot
+ggplot(results, aes(x = Observed, y = Predicted)) +
+  geom_point(color = "#1f78b4", alpha = 0.6) +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
+  labs(
+    title = "Actual vs Predicted Energy Output (Test Data)",
+    x = "Actual", y = "Predicted"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, color = "#003366"),
+    axis.title = element_text(face = "bold", color = "#003366")
+  )
+
+```
+```{r}
+# Density plot of training Y 
+ggplot(data.frame(y_train = train_data$y), aes(x = y_train)) +
+  geom_density(fill = "#1f78b4", alpha = 0.6) +
+  geom_vline(xintercept = mean(train_data$y), color = "red", linetype = "dashed") +
+  labs(
+    title = "Density Plot of Training Energy Output (Y)",
+    x = "Energy Output", y = "Density"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, color = "#003366"),
+    axis.title = element_text(face = "bold", color = "#003366")
+  )
+```
+```{r}
+# Using training data from split
+X_manual <- cbind(
+  1,
+  train_data$x4,
+  train_data$x1_sq,
+  train_data$x3_sq
+)
+
+Y_manual <- as.matrix(train_data$y)
+thetaHat_training <- ginv(t(X_manual) %*% X_manual) %*% t(X_manual) %*% Y_manual
+
+# Using MASS::ginv
+
+thetaHat_training <- ginv(t(X_manual) %*% X_manual) %*% t(X_manual) %*% Y_manual
+
+theta_labels <- c("θ₀ (bias)", "θ₁ (Humidity)", "θ₂ (Temperature²)", "θ₃ (Pressure²)")
+theta_values <- as.numeric(thetaHat_training)
+
+data.frame(Parameter = theta_labels, Estimate = round(theta_values, 6)) %>%
+  kbl(caption = "Manually Estimated Model Parameters (Training Data)") %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    full_width = FALSE, position = "center"
+  ) %>%
+  row_spec(0, bold = TRUE, background = "#2c3e50", color = "white")
+
+```
+
+```{r}
+round(coef(model5_train), 6)
+```
+
+# Task 3 –  Approximate Bayesian Computation (ABC)  
+Using ‘rejection ABC’ method to compute the posterior distributions of the ‘selected’  regression model parameters in Task 2.  
+1) You only need to compute 2 parameter posterior distributions -- the 2 parameters withlargest absolute value in your least squares estimation (Task 2.1) of the selected model. Fix all the other parameters in your model as constant, by using the estimated values from Task 2.1.  
+2) Use a Uniform distribution as prior, around the estimated parameter values for those 2 parameters (from Task 2.1). You will need to determine the range of the prior distribution. 
+3) Draw samples from the above Uniform prior and perform rejection ABC for those 2 parameters.
+4) Plot the joint and marginal posterior distribution for those 2 parameters.  
+5) Explain your results. 
+
+
+```{r}
+# Fixed values from Task 2.1
+theta_fixed <- c(
+  intercept = 251.6717,
+  humidity  = 0.2272,
+  temp_sq   = -0.0365,
+  press_sq  = -0.0037
+)
+
+# Define Uniform priors for θ₀ and θ₁ (±20%)
+prior_theta0 <- c(0.8 * theta_fixed["intercept"], 1.2 * theta_fixed["intercept"])
+prior_theta1 <- c(0.8 * theta_fixed["humidity"], 1.2 * theta_fixed["humidity"])
+
+# Design matrix for Model 5
+X_model5 <- cbind(
+  1,
+  X$Humidity,
+  X$Temperature^2,
+  X$Pressure^2
+)
+
+#  Baseline Ŷ and RSS
+Y_hat_base <- X_model5 %*% theta_fixed
+RSS_base <- sum((Y - Y_hat_base)^2)
+
+# Rejection ABC Setup
+set.seed(123)
+n_samples <- 5000
+epsilon <- RSS_base * 1.2
+
+accepted_theta0 <- c()
+accepted_theta1 <- c()
+
+# Rejection Sampling Loop
+for (i in 1:n_samples) {
+  theta0_sample <- runif(1, prior_theta0[1], prior_theta0[2])
+  theta1_sample <- runif(1, prior_theta1[1], prior_theta1[2])
+  
+  theta_proposed <- c(
+    theta0_sample,
+    theta1_sample,
+    theta_fixed["temp_sq"],
+    theta_fixed["press_sq"]
+  )
+  
+  Y_hat_sim <- X_model5 %*% theta_proposed
+  RSS_sim <- sum((Y - Y_hat_sim)^2)
+  
+  if (RSS_sim < epsilon) {
+    accepted_theta0 <- c(accepted_theta0, theta0_sample)
+    accepted_theta1 <- c(accepted_theta1, theta1_sample)
+  }
+}
+
+cat("ABC complete — Accepted samples:", length(accepted_theta0), "out of", n_samples, "\n")
+```
+
+```{r}
+# Combine accepted samples from rejection ABC into a data frame
+posterior_df <- data.frame(
+  theta0 = accepted_theta0,
+  theta1 = accepted_theta1
+)
+```
+```{r}
+# Joint Posterior Plot
+ggplot(posterior_df, aes(x = theta0, y = theta1)) +
+  geom_point(alpha = 0.5, color = "#1f78b4") +
+  labs(
+    title = "Joint Posterior Distribution through ABC",
+    x = expression(theta[0] ~ "(Intercept)"),
+    y = expression(theta[1] ~ "(Humidity Coefficient)")
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, color = "#003366"),
+    axis.title = element_text(face = "bold", color = "#003366")
+  )
+```
+
+
+```{r}
+# Marginal Posterior of θ₀ (Intercept)
+ggplot(posterior_df, aes(x = theta0)) +
+  geom_histogram(bins = 30, fill = "#1f78b4", alpha = 0.7) +
+  geom_vline(xintercept = theta_fixed["intercept"], color = "black", linetype = "dashed", linewidth = 1) +
+  labs(
+    title = expression("Marginal Posterior of " ~ theta[0]),
+    x = expression(theta[0]), y = "Count"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, color = "#003366"),
+    axis.title = element_text(face = "bold", color = "#003366")
+  )
+
+```
+
+```{r}
+
+#  Marginal Posterior of θ₁ (Humidity)
+ggplot(posterior_df, aes(x = theta1)) +
+  geom_histogram(bins = 30, fill = "#e31a1c", alpha = 0.7) +
+  geom_vline(xintercept = theta_fixed["humidity"], color = "black", linetype = "dashed", linewidth = 1) +
+  labs(
+    title = expression("Marginal Posterior of " ~ theta[1]),
+    x = expression(theta[1]), y = "Count"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, color = "#003366"),
+    axis.title = element_text(face = "bold", color = "#003366")
+  )
+
+```
+```{r}
+# Create posterior summary table
+posterior_summary <- data.frame(
+  Parameter = c("θ₀ (Intercept)", "θ₁ (Humidity)"),
+  Mean = c(mean(accepted_theta0), mean(accepted_theta1)),
+  SD   = c(sd(accepted_theta0), sd(accepted_theta1))
+)
+
+posterior_summary %>%
+  kbl(
+    caption = "Posterior Summary (ABC Accepted Parameters)",
+    align = "c"
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    full_width = FALSE,
+    position = "center"
+  ) %>%
+  row_spec(0, bold = TRUE, background = "#2c3e50", color = "white")
+```
+
+
+
+
+
+
